@@ -4,7 +4,7 @@
 Wireless Live Streaming Plugin can stream live 360 movie via RTMP or RTSP directly from RICOH THETA.
 
 ## History
-* ver 2.0.0: RTSP protocol support added. Protocol can be switched between RTMP and RTSP in the Web UI.
+* ver 2.0.0 (2026/06/30): RTSP protocol support added. Protocol can be switched between RTMP and RTSP in the Web UI.
 * ver 1.2.3 (2023/04/18): Bugfix related to dynamic stitching and zenith correction for THETA X.
 * ver 1.2.2 (2022/09/06): Following settings are added for THETA X 1.20 or later.  
     * 4K (3840 x 2160) 15FPS  
