@@ -69,6 +69,10 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.pedro.rtmp.utils.ConnectCheckerRtmp;
+import com.pedro.rtplibrary.base.Camera1Base;
+import com.pedro.rtplibrary.rtsp.RtspCamera1;
+import com.pedro.rtsp.rtsp.Protocol;
+import com.pedro.rtsp.utils.ConnectCheckerRtsp;
 import com.theta360.pluginlibrary.values.TextArea;
 import com.theta360.pluginlibrary.values.ThetaModel;
 
@@ -81,7 +85,7 @@ import static com.theta360.cloudstreaming.httpserver.AndroidWebServer.encodeStre
 import static com.theta360.pluginlibrary.values.ThetaModel.isZ1Model;
 import static java.lang.Math.pow;
 
-public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
+public class MainActivity extends PluginActivity implements ConnectCheckerRtmp, ConnectCheckerRtsp {
 
     private final int BYTE_TO_BIT = 8;
     private final double BIT_TO_MBIT = 1 / pow(10, 6);
@@ -116,7 +120,8 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
     private final String LABELS_SAMPLING_RATE_48000 = "48.0KHz";
     private final String LABELS_SAMPLING_RATE_44100 = "44.1KHz";
 
-    private RtmpCamera1  mRtmpCamera1;
+    private RtmpCamera1 mRtmpCamera1;
+    private RtspCamera1 mRtspCamera1;
 
     private AudioManager am;
     private TextView status;
@@ -380,6 +385,28 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
         createScheduleStreaming();
     }
 
+    private boolean isRtspProtocol() {
+        return settingData != null && "RTSP".equals(settingData.getProtocol());
+    }
+
+    private boolean isAnyStreaming() {
+        return mRtmpCamera1.isStreaming() || (mRtspCamera1 != null && mRtspCamera1.isStreaming());
+    }
+
+    private RtspCamera1 getOrCreateRtspCamera() {
+        if (mRtspCamera1 == null) {
+            mRtspCamera1 = new RtspCamera1(openGlView, this);
+            mRtspCamera1.setProtocol(Protocol.TCP);
+        }
+        return mRtspCamera1;
+    }
+
+    private Camera1Base activeCamera() {
+        if (mRtspCamera1 != null && mRtspCamera1.isStreaming()) return mRtspCamera1;
+        if (mRtmpCamera1.isStreaming()) return mRtmpCamera1;
+        return isRtspProtocol() ? getOrCreateRtspCamera() : mRtmpCamera1;
+    }
+
     /**
      * {@inheritDoc}
      * Called when the connection to Rtmp server is succeeded
@@ -534,6 +561,10 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
             mRtmpCamera1.stopStream();
             shutDownTimer.reset(false, noOperationTimeoutMSec);
             mRtmpCamera1.stopCamera();
+        } else if (mRtspCamera1 != null && mRtspCamera1.isStreaming()) {
+            mRtspCamera1.stopStream();
+            shutDownTimer.reset(false, noOperationTimeoutMSec);
+            mRtspCamera1.stopCamera();
         }
     }
 
@@ -583,9 +614,11 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
             return;
         }
 
-        if (!mRtmpCamera1.isStreaming()) {
+        if (!isAnyStreaming()) {
             startStreaming();
-            startDelayJudgment();
+            if (!isRtspProtocol()) {
+                startDelayJudgment();
+            }
         } else {
             // Stop when streaming button is pushed during streaming.
             stopStreaming();
@@ -632,22 +665,23 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
             int audioSamplingRate = settingData.getAudioSamplingRate();
 
             // Check video and audio preparation
-            if (mRtmpCamera1.prepareAudio(128 * 1024,audioSamplingRate, false, false, false)
-                    && mRtmpCamera1.prepareVideo(movieW, movieH, (int)settingData.getFps(), (int)(bitRate * 1000000),2,0) ) {
+            Camera1Base camera = activeCamera();
+            if (camera.prepareAudio(128 * 1024, audioSamplingRate, false, false, false)
+                    && camera.prepareVideo(movieW, movieH, (int)settingData.getFps(), (int)(bitRate * 1000000), 2, 0)) {
 
                 // Start streaming
                 CheckIsStreamVideo.init();
-                mRtmpCamera1.startStream(settingData.getServerUrl() + "/" + settingData.getStreamName());
+                camera.startStream(settingData.getServerUrl() + "/" + settingData.getStreamName());
 
                 if (ThetaModel.isVCameraModel()) {
                     cameraPreview.start(openGlView.getSurfaceTexture());
                 }
 
-                if (mRtmpCamera1.isStreaming()) {
+                if (camera.isStreaming()) {
                     changeStreamingLED();
                 } else {
                     // Illegal server URL
-                    if (ThetaModel.isVCameraModel()){
+                    if (ThetaModel.isVCameraModel()) {
                         cameraPreview.stop();
                     }
                 }
@@ -667,11 +701,12 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
         if (delayJudgmentService != null) {
             delayJudgmentService.shutdownNow();
         }
-        mRtmpCamera1.stopStream();
+        Camera1Base camera = activeCamera();
+        camera.stopStream();
         if (ThetaModel.isVCameraModel()) {
             cameraPreview.stop();
         }
-        mRtmpCamera1.stop();
+        camera.stop();
     }
 
     private void exitProcess() {
@@ -953,6 +988,7 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
                                 settingData.setAudioSamplingRate(cursor.getInt(cursor.getColumnIndex("audio_sampling_rate")));
                                 settingData.setNoOperationTimeoutMinute(cursor.getInt(cursor.getColumnIndex("no_operation_timeout_minute")));
                                 settingData.setStatus(cursor.getString(cursor.getColumnIndex("status")));
+                                settingData.setProtocol(cursor.getString(cursor.getColumnIndex("protocol")));
                             } else {
                                 // Create new recode if DB is empty.
                                 ContentValues values = new ContentValues();
@@ -971,6 +1007,7 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
                                 values.put("crypt_text", "");
                                 values.put("audio_sampling_rate", AndroidWebServer.DEFAULT_AUDIO_SAMPLING_RATE);
                                 values.put("no_operation_timeout_minute", AndroidWebServer.TIMEOUT_DEFAULT_MINUTE);
+                                values.put("protocol", "RTMP");
 
                                 long num = dbObject.insert("theta360_setting", null, values);
                                 if (num != 1) {
@@ -999,6 +1036,8 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
                                             cursor.getColumnIndex("no_operation_timeout_minute")));
                                     settingData.setStatus(
                                             cursor.getString(cursor.getColumnIndex("status")));
+                                    settingData.setProtocol(
+                                            cursor.getString(cursor.getColumnIndex("protocol")));
                                 }
                             }
 
@@ -1450,13 +1489,137 @@ public class MainActivity extends PluginActivity implements ConnectCheckerRtmp {
             values.put("audio_sampling_rate", 44100);
             settingData.setAudioSamplingRate(44100);
         }
+        values.put("protocol", settingData.getProtocol());
         dbObject.update("theta360_setting", values, "id=?", new String[]{String.valueOf(PRIMARY_KEY_ID)});
     }
 
     @Override
-    public void onNewBitrateRtmp(long bitrate){return;}
+    public void onNewBitrateRtmp(long bitrate) { return; }
 
     @Override
-    public void onConnectionStartedRtmp(String str){return;}
+    public void onConnectionStartedRtmp(String str) { return; }
+
+    // ---- ConnectCheckerRtsp ----
+
+    @Override
+    public void onConnectionStartedRtsp(String str) { return; }
+
+    @Override
+    public void onConnectionSuccessRtsp() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Timber.i("RTSP server connection succeeded.");
+                notificationAudioMovStart();
+                status.setTextColor(getColor(R.color.colorStop));
+                status.setText("●");
+                statusText.setText(getResources().getString(R.string.message_live_streaming));
+                liveButton.setBackgroundResource(R.drawable.shape_rounded_corners_stop);
+                liveButton.setText(getResources().getString(R.string.stop_live_streaming));
+                etUrl.setEnabled(false);
+                streamName.setEnabled(false);
+                movieSize.setEnabled(false);
+                bitrate.setEnabled(false);
+                samplingRate.setEnabled(false);
+                updateStatus(StatusType.LIVE_STREAMING);
+                if (!ThetaModel.isVCameraModel()) {
+                    lcdBrightness = mRtspCamera1.getLcdBrightness();
+                    mRtspCamera1.ctrlBrightness(1);
+                    ledPowerBrightness = mRtspCamera1.getLedPowerBrightness(3);
+                    ledStatusBrightness = mRtspCamera1.getLedStatusBrightness(3);
+                    mRtspCamera1.ctrlLedPowerBrightness(3, 1);
+                    mRtspCamera1.ctrlLedStatusBrightness(3, 1);
+                }
+                isConnectionSuccess = true;
+                shutDownTimer.reset(true, noOperationTimeoutMSec);
+            }
+        });
+    }
+
+    @Override
+    public void onConnectionFailedRtsp(final String reason) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Timber.e("Connection to RTSP server failed. " + reason);
+                shutDownTimer.reset(false, noOperationTimeoutMSec);
+                status.setTextColor(getColor(R.color.colorStop));
+                status.setText("!");
+                statusText.setText(getResources().getString(R.string.message_error_connect_server));
+                updateStatus(StatusType.ERROR_CONNECT_SERVER);
+                notificationAudioWarning();
+                if (System.currentTimeMillis() - lastConnectionFailedErrorTime > CONNECTION_FAILED_INTERVAL_MSEC) {
+                    lastConnectionFailedErrorTime = System.currentTimeMillis();
+                    playPPPSoundWithErrorLED();
+                }
+                settingPolling.changeStart();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (scheduleStreaming != null) {
+                            scheduleStreaming.setSchedule();
+                        }
+                    }
+                }, 300);
+            }
+        });
+    }
+
+    @Override
+    public void onNewBitrateRtsp(long bitrate) { return; }
+
+    @Override
+    public void onDisconnectRtsp() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Timber.i("Disconnected from RTSP server.");
+                if (isConnectionSuccess) {
+                    notificationAudioMovStop();
+                    status.setTextColor(getColor(R.color.colorStart));
+                    status.setText("●");
+                    statusText.setText(getResources().getString(R.string.message_stop_streaming));
+                    liveButton.setBackgroundResource(R.drawable.shape_rounded_corners_start);
+                    liveButton.setText(getResources().getString(R.string.start_live_streaming));
+                    etUrl.setEnabled(true);
+                    streamName.setEnabled(true);
+                    movieSize.setEnabled(true);
+                    bitrate.setEnabled(true);
+                    samplingRate.setEnabled(true);
+                    if (!ThetaModel.isVCameraModel()) {
+                        mRtspCamera1.ctrlBrightness(lcdBrightness);
+                        mRtspCamera1.ctrlLedPowerBrightness(3, ledPowerBrightness);
+                        mRtspCamera1.ctrlLedStatusBrightness(3, ledStatusBrightness);
+                    }
+                    isConnectionSuccess = false;
+                } else {
+                    updateStatus(StatusType.ERROR_CONNECT_SERVER);
+                }
+                shutDownTimer.reset(false, noOperationTimeoutMSec);
+            }
+        });
+    }
+
+    @Override
+    public void onAuthErrorRtsp() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Timber.e("RTSP authentication failed.");
+                shutDownTimer.reset(false, noOperationTimeoutMSec);
+            }
+        });
+    }
+
+    @Override
+    public void onAuthSuccessRtsp() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Timber.i("RTSP authenticated.");
+                shutDownTimer.reset(true, noOperationTimeoutMSec);
+            }
+        });
+    }
 
 }

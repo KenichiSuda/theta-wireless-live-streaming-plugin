@@ -44,6 +44,9 @@ public class SettingData {
     // Information
     private String status;  // Status
 
+    // Protocol: "RTMP" or "RTSP"
+    private String protocol;
+
     /**
      * Constructor
      */
@@ -59,6 +62,7 @@ public class SettingData {
         this.noOperationTimeoutMinute = AndroidWebServer.TIMEOUT_DEFAULT_MINUTE;
         this.audioSamplingRate = AndroidWebServer.DEFAULT_AUDIO_SAMPLING_RATE;
         this.status = StatusType.RUNNING.getCode();
+        this.protocol = "RTMP";
     }
 
     /**
@@ -241,6 +245,24 @@ public class SettingData {
     public void setStatus(String status) {
         if (status != null)
             this.status = status;
+    }
+
+    /**
+     * Get Protocol
+     *
+     * @return Streaming protocol ("RTMP" or "RTSP")
+     */
+    public String getProtocol() {
+        return this.protocol;
+    }
+
+    /**
+     * Set Protocol
+     *
+     * @param protocol Streaming protocol ("RTMP" or "RTSP")
+     */
+    public void setProtocol(String protocol) {
+        this.protocol = (protocol != null) ? protocol : "RTMP";
     }
 
     /**
