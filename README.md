@@ -1,9 +1,10 @@
 # Wireless Live Streaming Plugin
 
 ## Overview
-Wireless Live Streaming Plugin can stream live 360 movie to YouTube via RTMP directly from RICOH THETA. 
+Wireless Live Streaming Plugin can stream live 360 movie via RTMP or RTSP directly from RICOH THETA.
 
 ## History
+* ver 2.0.0: RTSP protocol support added. Protocol can be switched between RTMP and RTSP in the Web UI.
 * ver 1.2.3 (2023/04/18): Bugfix related to dynamic stitching and zenith correction for THETA X.
 * ver 1.2.2 (2022/09/06): Following settings are added for THETA X 1.20 or later.  
     * 4K (3840 x 2160) 15FPS  
@@ -70,31 +71,45 @@ For example, let's assume that there is a THETA, a macOS machine, and an iPhone 
    1. Back to the Camera settings.
    1. Check the IP address of THETA on the smartphone app.  
    If you use macOS, type "dns-sd -q THETAYL01234567.local" in Terminal. Here "THETAYL01234567" is an example. Please change it to your serial number.
-7. Setup "Stream Name" and "Primary Server URL" on [YouTube](http://www.youtube.com/my_live_events).
-   1. Setup [YouTube Ingestion Settings in event](http://www.youtube.com/my_live_events) and check "Stream Name" and "Primary Server URL"
-   1. Select the "Reusable stream key" in the "Select type of stream key" of the setting. This is the key point to omit the plug-in setting from the next.
-8. Launch the plug-in.  
+7. Launch the plug-in.  
    Press the Mode button till LED2 turns white or launch plug-in from the smartphone app (RICOH THETA)
-9. Open Web UI of the plug-in.  
+8. Open Web UI of the plug-in.  
     Open the URL (http://*ip-address*:8888) on the browser.  
-    Here, *ip-address* is an an example. Change it to your THETA's IP address.
-10. Enter streaming setting.
-    1. Put "Primary Server URL" of YouTube to the "Server URL" box in Web UI.
-    1. Put "Stream Name" of YouTube to the "Stream name/key" box in Web UI.
+    Here, *ip-address* is an example. Change it to your THETA's IP address.
+9. Enter streaming setting.
+    1. Select "Protocol" (`RTMP` or `RTSP`). Default is `RTMP`.
+    1. Put the server URL to the "Server URL" box in Web UI.
+       * RTMP example: `rtmp://a.rtmp.youtube.com/live2`
+       * RTSP example: `rtsp://192.168.1.100:8554`
+    1. Put the stream name / key to the "Stream name/key" box in Web UI.
     1. Select Resolution (e.g. 4K(3840x2160) 30fps).
     1. Select Bit rates from the list.
     1. Select Audio sample rate (e.g., 48.0KHz).
     1. Press the "Fix streaming settings" button.
-11. Prepare streaming on [YouTube](http://www.youtube.com/my_live_events).
-    Please use the same stream name specified in step.7.
-12. Start streaming from THETA
+10. (RTMP only) Prepare streaming on [YouTube](http://www.youtube.com/my_live_events).
+11. Start streaming from THETA.
     Press the Shutter key or press the "Start streaming" button in the Web UI.
-13. Check the preview on YouTube's "Live Control Room" or Facebook live.
-14. Start streaming from YouTube.
-15. On the air
-16. Stop streaming from YouTube.
-17. Stop streaming from THETA.
+12. Stop streaming from THETA.
     Press the Shutter key or press the "Stop streaming" button in the Web UI.
+
+### Streaming via RTMP (YouTube)
+
+7. Setup "Stream Name" and "Primary Server URL" on [YouTube](http://www.youtube.com/my_live_events).
+   1. Setup [YouTube Ingestion Settings in event](http://www.youtube.com/my_live_events) and check "Stream Name" and "Primary Server URL"
+   1. Select the "Reusable stream key" in the "Select type of stream key" of the setting. This is the key point to omit the plug-in setting from the next.
+8. In the Web UI, select Protocol `RTMP` and enter the YouTube "Primary Server URL" and "Stream Name".
+9. Start streaming from THETA and check the preview on YouTube's "Live Control Room".
+10. Start streaming from YouTube.
+11. Stop streaming from YouTube, then stop streaming from THETA.
+
+### Streaming via RTSP
+
+RTSP is useful for streaming to a local media server (e.g. [MediaMTX](https://github.com/bluenviron/mediamtx), VLC, FFmpeg).
+
+8. In the Web UI, select Protocol `RTSP` and enter the RTSP server URL and stream path.  
+   The plug-in connects to `<Server URL>/<Stream Name>` (e.g. `rtsp://192.168.1.100:8554/live`).
+9. Start streaming from THETA.
+10. Stop streaming from THETA.
 
 ---
 
