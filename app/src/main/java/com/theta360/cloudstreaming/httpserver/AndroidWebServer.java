@@ -364,6 +364,9 @@ public class AndroidWebServer extends Activity {
                     values.put("audio_sampling_rate", parms.get("audio_sampling_rate"));
                     values.put("no_operation_timeout_minute", parms.get("no_operation_timeout_minute"));
 
+                    String protocol = parms.get("protocol");
+                    values.put("protocol", ("RTSP".equals(protocol)) ? "RTSP" : "RTMP");
+
                     long num = dbObject.update("theta360_setting", values, "id=?", new String[]{String.valueOf(PRIMARY_KEY_ID)});
                     if (num != 1) {
                         this.LOG.severe("update line num error= " + num);
@@ -463,12 +466,14 @@ public class AndroidWebServer extends Activity {
 
                 // Insert the parameters obtained from the DB
                 // Insert by replacing the character string "#JS_INJECTION#" in html
+                String currentProtocol = settingData.getProtocol() != null ? settingData.getProtocol() : "RTMP";
                 String JSCode = "\\$(function() {\n"
                     + "\\$('#server_url_text').val('" + settingData.getServerUrl() + "');"
                     + "\\$('#stream_name_text').val('');"  // Don't include plain text of stream name
                     + "\\$('#crypt_text').val('" + settingData.getCryptText() + "');"
                     + "\\$('#encryption_key').val('" + ENCRYPTION_KEY + "');"
-                    + "\\$('#encryption_iv').val('" + ENCRYPTION_IV + "');";
+                    + "\\$('#encryption_iv').val('" + ENCRYPTION_IV + "');"
+                    + "\\$('#protocol_select').val('" + currentProtocol + "');";
 
                 // When the width is 3840, it is judged to be 4 K, and selection of the bit rate of 2 k is made invisible.
                 if (settingData.getMovieWidth() == 3840 && settingData.getFps() == 30.0) {
@@ -602,6 +607,7 @@ public class AndroidWebServer extends Activity {
                     settingData.setAudioSamplingRate(Integer.parseInt(prevent_xss(cursor.getString(cursor.getColumnIndex("audio_sampling_rate")))));
                     settingData.setNoOperationTimeoutMinute(Integer.parseInt(prevent_xss(cursor.getString(cursor.getColumnIndex("no_operation_timeout_minute")))));
                     settingData.setStatus(prevent_xss(cursor.getString(cursor.getColumnIndex("status"))));
+                    settingData.setProtocol(cursor.getString(cursor.getColumnIndex("protocol")));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
